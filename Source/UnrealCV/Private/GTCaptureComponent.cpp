@@ -4,6 +4,7 @@
 #include "cnpy.h"
 #include "Serialization.h"
 #include "IImageWrapperModule.h"
+#include "Engine/Scene.h"
 
 DECLARE_CYCLE_STAT(TEXT("SaveExr"), STAT_SaveExr, STATGROUP_UnrealCV);
 DECLARE_CYCLE_STAT(TEXT("SavePng"), STAT_SavePng, STATGROUP_UnrealCV);
@@ -202,6 +203,23 @@ void UGTCaptureComponent::SetFOVAngle(float FOV)
         Iterator.Value()->FOVAngle = FOV;
     }
 }
+
+void UGTCaptureComponent::SetAutoExposure(float Exposure)
+{
+    static FPostProcessSettings PP;
+    PP.AutoExposureBias = Exposure;
+    PP.AutoExposureMinBrightness = 0.03;
+    PP.AutoExposureMaxBrightness = 2.0;
+    PP.bOverride_AutoExposureBias = 1;
+    PP.bOverride_AutoExposureMinBrightness = 1;
+    PP.bOverride_AutoExposureMaxBrightness = 1;
+    for (auto Iterator = CaptureComponents.CreateIterator(); Iterator; ++Iterator)
+    {
+        Iterator.Value()->PostProcessSettings = PP;
+        Iterator.Value()->PostProcessBlendWeight = 1;
+    }
+}
+
 
 FAsyncRecord* UGTCaptureComponent::Capture(FString Mode, FString InFilename)
 {

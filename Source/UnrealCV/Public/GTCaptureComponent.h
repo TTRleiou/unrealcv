@@ -39,6 +39,8 @@ public:
 
 	void SetFOVAngle(float FOV);
 
+	void SetAutoExposure(float Exposure);
+
 	/** Save image to a file */
 	FAsyncRecord* Capture(FString Mode, FString Filename);
 

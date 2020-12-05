@@ -33,6 +33,10 @@ public:
 	/** vget /actor/location */
 	FExecStatus GetActorLocation(const TArray<FString>& Args);
 
+	/** vset /camera/[id]/exposure */
+	FExecStatus SetAutoExposure(const TArray<FString>& Args);
+
+
 	/** vget /camera/view */
 	FExecStatus GetScreenshot(const TArray<FString>& Args);
 

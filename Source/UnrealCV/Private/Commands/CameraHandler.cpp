@@ -12,6 +12,7 @@
 #include "ObjectPainter.h"
 #include "ScreenCapture.h"
 #include "Serialization.h"
+#include "Engine/Scene.h"
 
 FString GetDiskFilename(FString Filename)
 {
@@ -115,6 +116,10 @@ void FCameraCommandHandler::RegisterCommands()
 	Cmd = FDispatcherDelegate::CreateRaw(this, &FCameraCommandHandler::GetActorRotation);
 	Help = "Get actor rotation [pitch, yaw, roll]";
 	CommandDispatcher->BindCommand("vget /actor/rotation", Cmd, Help);
+
+	Cmd = FDispatcherDelegate::CreateRaw(this, &FCameraCommandHandler::SetAutoExposure);
+	Help = "Set auto exporsure";
+	CommandDispatcher->BindCommand("vset /camera/[uint]/exposure [float]", Cmd, Help); 
 
 	Help = "Return raw binary image data, instead of the image filename";
 	Cmd = FDispatcherDelegate::CreateLambda([this](const TArray<FString>& Args) { return GetPngBinary(Args, TEXT("lit")); });
@@ -586,6 +591,62 @@ FExecStatus FCameraCommandHandler::GetActorLocation(const TArray<FString>& Args)
 	FVector CameraLocation = Pawn->GetActorLocation();
 	FString Message = FString::Printf(TEXT("%.3f %.3f %.3f"), CameraLocation.X, CameraLocation.Y, CameraLocation.Z);
 	return FExecStatus::OK(Message);
+}
+
+FExecStatus FCameraCommandHandler::SetAutoExposure(const TArray<FString>& Args)
+{
+	if (Args.Num() == 2) {
+        int32 CameraId = FCString::Atoi(*Args[0]); // TODO: Add support for multiple cameras
+        if (CameraId != 0)
+        {
+        	return FExecStatus::Error("Setting auto exposure is only supported for camera 0");
+        }
+
+        double exposure = FCString::Atof(*Args[1]);
+
+        bool bIsMatinee = false;
+
+        for (AActor* Actor : this->GetWorld()->GetCurrentLevel()->Actors)
+        {
+            // if (Actor && Actor->IsA(AMatineeActor::StaticClass())) // AMatineeActor is deprecated
+            bool FoundCamera = false;
+            if (Actor && Actor->IsA(ACameraActor::StaticClass()))
+            {
+                bIsMatinee = true;
+                UCameraComponent* CameraComponent = Actor->FindComponentByClass<UCameraComponent>();
+                if (CameraComponent != nullptr) {
+                    UE_LOG(LogUnrealCV, Warning, TEXT("Setting auto exposure to: %d"), exposure);
+                    static FPostProcessSettings PP;
+                    PP.AutoExposureBias = exposure;
+                    PP.AutoExposureMinBrightness = 0.03;
+                    PP.AutoExposureMaxBrightness = 2.0;
+                    PP.bOverride_AutoExposureBias = 1;
+                    PP.bOverride_AutoExposureMinBrightness = 1;
+                    PP.bOverride_AutoExposureMaxBrightness = 1;
+                    CameraComponent->AddExtraPostProcessBlend(PP, 1.0);
+                    APlayerCameraManager* CameraManager = UGameplayStatics::GetPlayerCameraManager(GetWorld(), 0);
+                    CameraManager->AddCachedPPBlend(PP, 1.0);
+                    break;
+                }
+            }
+        }
+		
+        UGTCaptureComponent* CaptureComponent = FCaptureManager::Get().GetCamera(CameraId);
+        if (CaptureComponent == nullptr)
+        {
+          return FExecStatus::Error(FString::Printf(TEXT("Camera %d can not be found."), CameraId));
+        }
+            UGTCaptureComponent* GTCapturer = FCaptureManager::Get().GetCamera(CameraId);
+            if (GTCapturer == nullptr)
+            {
+                return FExecStatus::Error(FString::Printf(TEXT("Invalid camera id %d"), CameraId));
+            }
+            GTCapturer->SetAutoExposure(exposure);
+		
+        return FExecStatus::OK();
+
+	}
+    return FExecStatus::Error("Number of arguments incorrect");
 }
 
 FExecStatus FCameraCommandHandler::GetPngBinary(const TArray<FString>& Args, const FString& ViewMode)
